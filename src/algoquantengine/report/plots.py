@@ -34,3 +34,23 @@ def plot_cluster_heatmap(corr: np.ndarray, labels: np.ndarray, path: str | None 
     else:
         plt.show()
     plt.close()
+
+def plot_frontier(frontier: list[dict], path: str | None = None) -> None:
+    import matplotlib.pyplot as plt
+    from pathlib import Path
+
+    vols = [p["vol"] for p in frontier]
+    rets = [p["return"] for p in frontier]
+
+    plt.figure()
+    plt.plot(vols, rets, marker="o", linestyle="-")
+    plt.xlabel("Volatility")
+    plt.ylabel("Expected Return")
+    plt.title("Efficient Frontier")
+
+    if path:
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(path, bbox_inches="tight", dpi=200)
+    else:
+        plt.show()
+    plt.close()
