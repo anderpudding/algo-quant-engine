@@ -32,18 +32,27 @@ def spectral_clusters_from_corr(
     n = corr.shape[0]
     if corr.shape != (n, n):
         raise ValueError("corr must be square N×N")
-    if n_clusters < 2 or n_clusters > n:
-        raise ValueError("n_clusters must be in [2, N]")
+
+    # For very small N, spectral clustering is unstable/meaningless.
+    # Return deterministic labels and avoid sklearn internals.
+    if n <= 2:
+        return np.arange(n, dtype=int)
+
+    if n_clusters < 2:
+        raise ValueError("n_clusters must be >= 2")
+    if n_clusters > n:
+        n_clusters = n
 
     # affinity must be non-negative; map correlation to [0,1]
     affinity = (corr + 1.0) / 2.0
     np.fill_diagonal(affinity, 1.0)
 
+    # IMPORTANT: avoid kmeans (triggers threadpoolctl on your env)
     model = SpectralClustering(
         n_clusters=n_clusters,
         affinity="precomputed",
         random_state=seed,
-        assign_labels="kmeans",
+        assign_labels="discretize",
     )
     labels = model.fit_predict(affinity)
     return labels.astype(int)
