@@ -6,6 +6,10 @@ from algoquantengine.data.loaders import load_prices_csv
 from algoquantengine.data.preprocess import clean_prices, compute_returns
 from algoquantengine.data.features import estimate_mu_cov, corr_matrix
 
+from algoquantengine.opt.mean_variance import efficient_frontier
+from algoquantengine.report.plots import plot_frontier
+from algoquantengine.report.export import export_frontier_csv, export_weights_csv
+
 from algoquantengine.graph.build import build_graph_from_corr
 from algoquantengine.graph.algorithms import compute_mst, pagerank_centrality, spectral_clusters_from_corr
 from algoquantengine.report.plots import plot_mst, plot_cluster_heatmap
@@ -63,6 +67,17 @@ def build_parser() -> argparse.ArgumentParser:
     graph.add_argument("--out-dir", default="outputs/reports/graph0")
     graph.set_defaults(func=cmd_graph)
 
+    opt = sub.add_parser("opt", help="Run mean-variance optimization and efficient frontier")
+    opt.add_argument("--data", required=True)
+    opt.add_argument("--date-col", default="Date")
+    opt.add_argument("--assets", type=int, default=None)
+    opt.add_argument("--returns", choices=["log", "simple"], default="log")
+    opt.add_argument("--annualize", type=int, default=252)
+    opt.add_argument("--drop-thresh", type=float, default=0.05)
+    opt.add_argument("--frontier", type=int, default=25)
+    opt.add_argument("--out-dir", default="outputs/reports/opt0")
+    opt.set_defaults(func=cmd_opt)
+
     return p
 
 def cmd_graph(args: argparse.Namespace) -> None:
@@ -96,6 +111,38 @@ def cmd_graph(args: argparse.Namespace) -> None:
     print("OK")
     print(f"Saved: {fig_dir/'mst.png'}, {fig_dir/'cluster_heatmap.png'}")
     print(f"Saved: {tab_dir/'clusters.csv'}, {tab_dir/'pagerank.csv'}")
+
+def cmd_opt(args: argparse.Namespace) -> None:
+    prices = load_prices_csv(args.data, date_col=args.date_col)
+    prices = clean_prices(prices, fill_method="ffill", drop_thresh=args.drop_thresh)
+
+    if args.assets is not None:
+        prices = prices.iloc[:, : args.assets]
+
+    tickers = list(prices.columns)
+    rets = compute_returns(prices, method=args.returns)
+    mu, cov = estimate_mu_cov(rets, annualize=args.annualize)
+
+    frontier = efficient_frontier(cov, mu, n_points=args.frontier)
+
+    # pick best Sharpe
+    best = max(frontier, key=lambda p: p["sharpe"])
+    w_best = best["weights"]
+
+    out_dir = Path(args.out_dir)
+    fig_dir = out_dir / "figures"
+    tab_dir = out_dir / "tables"
+    fig_dir.mkdir(parents=True, exist_ok=True)
+    tab_dir.mkdir(parents=True, exist_ok=True)
+
+    export_frontier_csv(frontier, str(tab_dir / "frontier.csv"))
+    export_weights_csv(tickers, w_best, str(tab_dir / "weights_best_sharpe.csv"))
+    plot_frontier(frontier, str(fig_dir / "frontier.png"))
+
+    print("OK")
+    print(f"Saved: {tab_dir/'frontier.csv'}")
+    print(f"Saved: {tab_dir/'weights_best_sharpe.csv'}")
+    print(f"Saved: {fig_dir/'frontier.png'}")
 
 
 def main() -> None:
