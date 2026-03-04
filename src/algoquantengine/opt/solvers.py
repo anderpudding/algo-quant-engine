@@ -32,23 +32,51 @@ def project_to_simplex(v: np.ndarray) -> np.ndarray:
     return w / s
 
 
-def _apply_group_caps(w: np.ndarray, caps: list[tuple[list[int], float]] | None) -> np.ndarray:
+def _apply_group_caps(
+    w: np.ndarray,
+    caps: list[tuple[list[int], float]] | None,
+    *,
+    eps: float = 1e-12,
+    max_rounds: int = 50,
+) -> np.ndarray:
     """
-    Soft projection for group caps: for each group, if sum exceeds cap, scale down group.
-    Then re-project to simplex. This is a heuristic but stable for a demo system.
+    Iteratively enforce group caps and simplex constraint.
+
+    This is not a perfect constrained projection, but it enforces caps tightly
+    in practice by alternating:
+      (1) scale down violating groups
+      (2) project back to simplex
     """
     if not caps:
-        return w
+        return project_to_simplex(w)
 
-    w2 = w.copy()
-    for idxs, cap in caps:
-        idxs = list(idxs)
-        if len(idxs) == 0:
-            continue
-        gsum = float(w2[idxs].sum())
-        if gsum > cap and gsum > 0:
-            w2[idxs] *= cap / gsum
-    return project_to_simplex(w2)
+    w2 = project_to_simplex(w)
+
+    for _ in range(max_rounds):
+        violated = False
+
+        # scale down any group that exceeds its cap
+        for idxs, cap in caps:
+            idxs = list(idxs)
+            if not idxs:
+                continue
+
+            gsum = float(w2[idxs].sum())
+            if gsum > cap + eps and gsum > 0:
+                violated = True
+                # scale slightly under cap to avoid numerical rebound
+                scale = (cap - eps) / gsum if cap > eps else 0.0
+                scale = max(scale, 0.0)
+                w2[idxs] *= scale
+
+        # if no violations, we're done
+        if not violated:
+            break
+
+        # restore simplex constraint
+        w2 = project_to_simplex(w2)
+
+    return w2
 
 
 def projected_gradient_descent(
