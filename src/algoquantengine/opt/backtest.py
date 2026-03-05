@@ -12,9 +12,7 @@ def backtest_rebalance(
 ) -> pd.Series:
     """
     Walk-forward backtest using simple returns.
-    - At each rebalance date, compute weights from past lookback returns.
-    - Hold until next rebalance.
-    Returns equity curve (starting at 1.0).
+    Returns equity curve series (starting at 1.0 at the first backtest date).
     """
     if rebalance_every < 1 or lookback < 2:
         raise ValueError("rebalance_every must be >=1 and lookback >=2")
@@ -23,10 +21,11 @@ def backtest_rebalance(
     if len(rets) <= lookback:
         raise ValueError("Not enough data for backtest lookback")
 
-    equity = [1.0]
-    eq_dates = [rets.index[lookback]]
+    equity: list[float] = []
+    eq_dates: list[pd.Timestamp] = []
 
     current_w = None
+    eq = 1.0
 
     for t in range(lookback, len(rets)):
         if (t - lookback) % rebalance_every == 0 or current_w is None:
@@ -36,7 +35,9 @@ def backtest_rebalance(
                 raise ValueError("make_weights_fn returned invalid weight vector")
 
         r_t = float(rets.iloc[t].to_numpy() @ current_w)
-        equity.append(equity[-1] * (1.0 + r_t))
+        eq *= (1.0 + r_t)
+
+        equity.append(eq)
         eq_dates.append(rets.index[t])
 
-    return pd.Series(equity[1:], index=eq_dates)
+    return pd.Series(equity, index=eq_dates, name="equity")
