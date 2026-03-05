@@ -24,6 +24,9 @@ from algoquantengine.opt.risk import portfolio_pnl_from_scenarios, var_cvar, max
 from algoquantengine.opt.backtest import backtest_rebalance
 from algoquantengine.report.export import export_report_json
 
+from algoquantengine.bench.scaling import benchmark_scaling
+from algoquantengine.bench.plot import plot_scaling
+
 import pandas as pd
 import numpy as np
 
@@ -117,6 +120,10 @@ def build_parser() -> argparse.ArgumentParser:
     risk.add_argument("--lookback", type=int, default=252)
     risk.add_argument("--out-dir", default="outputs/reports/risk0")
     risk.set_defaults(func=cmd_risk)
+
+    bench = sub.add_parser("benchmark", help="Run runtime scaling benchmarks")
+    bench.add_argument("--out-dir", default="outputs/benchmarks")
+    bench.set_defaults(func=cmd_benchmark)
 
     return p
 
@@ -302,6 +309,25 @@ def cmd_risk(args: argparse.Namespace) -> None:
     print("OK")
     print(f"Saved: {out_dir/'risk_report.json'}")
 
+def cmd_benchmark(args):
+
+    sizes = [10, 20, 40, 80, 120]
+
+    df = benchmark_scaling(sizes)
+
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    csv_path = out_dir / "scaling.csv"
+    fig_path = out_dir / "scaling.png"
+
+    df.to_csv(csv_path, index=False)
+
+    plot_scaling(df, fig_path)
+
+    print("OK")
+    print(f"Saved: {csv_path}")
+    print(f"Saved: {fig_path}")
 
 def main() -> None:
     parser = build_parser()
