@@ -1,6 +1,6 @@
 # AlgoQuantEngine
 
-Hybrid quantitative finance and graph analytics system implementing portfolio optimization, correlation network analysis, and algorithmic benchmarking.
+Hybrid quantitative finance + graph analytics system implementing portfolio optimization, correlation network analysis, risk metrics, and algorithmic benchmarking.
 
 ---
 
@@ -8,15 +8,16 @@ Hybrid quantitative finance and graph analytics system implementing portfolio op
 
 AlgoQuantEngine is a computational research project that combines **quantitative finance**, **graph algorithms**, and **algorithmic performance analysis**.
 
-The system studies financial market structure by integrating:
+The system integrates:
 
-* Portfolio optimization (mean–variance framework)
-* Asset correlation network analysis
-* Graph-based diversification techniques
-* Monte Carlo market simulations
-* Computational complexity benchmarking
+- Portfolio optimization (mean–variance framework)
+- Asset correlation network analysis (MST, spectral clustering)
+- Graph-based diversification constraints (cluster caps)
+- Scenario-based risk estimation (VaR/CVaR)
+- Walk-forward backtesting (drawdown)
+- Runtime scaling benchmarks (complexity in practice)
 
-The goal of this project is to explore how **algorithmic methods and network structures can improve portfolio construction and risk analysis**.
+The goal is to explore how **market network structure** can shape portfolio construction and how core components scale with **number of assets (N)**.
 
 ---
 
@@ -28,9 +29,10 @@ The goal of this project is to explore how **algorithmic methods and network str
            +----------+----------+
                       |
                       v
-              +---------------+
-              | Data Pipeline |
-              +-------+-------+
+           +----------------------+
+           |     Data Pipeline    |
+           |  (prices -> returns) |
+           +----------+-----------+
                       |
         +-------------+-------------+
         |                           |
@@ -57,6 +59,53 @@ The goal of this project is to explore how **algorithmic methods and network str
 
 ---
 
+# Quickstart (2 minute demo)
+
+Install the package in editable mode:
+
+```bash
+python -m pip install -e .
+pip install -r requirements.txt
+```
+
+Run the full system pipeline:
+
+```bash
+python -m algoquantengine demo \
+--data data/raw/prices_demo.csv \
+--clusters 2 \
+--cap 0.9 \
+--lookback 3 \
+--rebalance 1 \
+--horizon 3 \
+--paths 500 \
+--benchmark
+```
+
+Outputs will be generated in:
+```
+output/demo/
+```
+
+Example output structure:
+
+```
+outputs/demo
+├─ graph/
+│  ├─ figures/
+│  └─ tables/
+├─ hybrid/
+│  ├─ figures/
+│  └─ tables/
+├─ risk/
+│  └─ risk_report.json
+└─ benchmarks/
+   ├─ scaling.csv
+   └─ scaling.png
+```
+
+---
+
 ## Key Components
 
 ### Data Pipeline
@@ -72,43 +121,82 @@ Processes financial time series data and computes statistical features.
 
 Implements classical portfolio theory.
 
+Capabilities:
+
 * Mean–variance optimization
 * Efficient frontier generation
-* Portfolio risk metrics
+* Projected gradient descent optimizer
+* Portfolio Sharpe ratio maximization
 
 ### Graph Analytics
 
 Constructs correlation-based asset networks.
 
+Implemented algorithms:
+
 * Correlation network construction
 * Minimum spanning tree (MST)
-* Network centrality analysis
-* Cluster-based diversification
+* Spectral clustering
+* Graph-based diversification constraints
+
+Graph structure is used to build **cluster weight caps** that constrain portfolio allocation.
+
+### Risk Analysis
+
+Implements standard quantitative risk metrics.
+
+Metrics:
+
+* Value at Risk (VaR)
+* Conditional Value at Risk (CVaR)
+* Maximum drawdown
+* Scenario-based Monte Carlo simulation
+* Walk-forward portfolio backtesting
 
 ### Simulation
 
-Models potential market scenarios.
+Generates potential market scenarios.
 
-* Monte Carlo return simulation
-* Stress testing scenarios
+Methods include:
+
+* Bootstrap sampling of historical returns
+* Monte Carlo simulation of portfolio returns
+* Scenario-based stress testing
 
 ### Benchmarking
 
-Analyzes computational efficiency.
+Evaluates algorithmic scalability and runtime complexity.
 
-* Runtime scaling experiments
-* Algorithm complexity analysis
-* Performance benchmarking
+Run benchmark suite:
+
+```bash
+python -m algoquantengine benchmark
+```
+
+Outputs:
+
+```
+outputs/benchmarks/
+├─ scaling.csv
+└─ scaling.png
+```
+
+The scaling experiment measures runtime of:
+
+* Covariance computation
+* Graph construction (MST)
+* Portfolio optimization
 
 ---
 
 ## Algorithms Implemented
 
 * Mean–Variance Portfolio Optimization
-* Projected Gradient Descent (planned)
+* Projected Gradient Descent
 * Minimum Spanning Tree (Kruskal)
 * Correlation Network Construction
-* Monte Carlo Simulation
+* Spectral Clustering
+* Bootstrap Monte Carlo Simulation
 
 ---
 
@@ -127,7 +215,64 @@ Where:
 * **T** = number of time observations
 * **E** = number of graph edges
 
-Empirical benchmarking will be included in later stages of the project.
+Benchmark results illustrate empirical scaling of these components.
+
+---
+
+## Command Line Interface
+
+Primary commands:
+
+#### Graph analysis
+
+```bash
+python -m algoquantengine graph --data data/raw/prices_demo.csv
+```
+
+Generates correlation network and MST.
+
+---
+
+#### Hybrid portfolio optimization
+
+```bash
+python -m algoquantengine hybrid --data data/raw/prices_demo.csv
+```
+
+Constructs cluster constraints from graph structure and runs constrained optimization.
+
+---
+
+#### Risk analysis
+
+```bash
+python -m algoquantengine risk --data data/raw/prices_demo.csv
+```
+
+Computes:
+* Var
+* CVar
+* Maximum drawdown
+
+---
+
+#### Benchmark scaling
+
+```bash
+python -m algoquantengine benchmark
+```
+
+Produces runtime scaling results.
+
+---
+
+#### Full pipeline demo
+
+```bash
+python -m algoquantengine demo --data data/raw/prices_demo.csv
+```
+
+Runs the complete system.
 
 ---
 
@@ -151,6 +296,12 @@ algoquantengine
 │
 ├─ src/
 │   └─ algoquantengine/
+│       ├─ data/
+│       ├─ graph/
+│       ├─ opt/
+│       ├─ sim/
+│       ├─ bench/
+│       └─ report/
 │
 ├─ tests/
 │
@@ -159,15 +310,25 @@ algoquantengine
 
 ---
 
+## Reproducibility
+
+Experiments are designed to be reproducible.
+
+* Random seeds are centralized in configuration.
+* Synthetic data generation uses deterministic seeds.
+* Benchmark experiments use fixed parameters.
+
+---
+
 ## Future Development
 
 Planned improvements include:
 
-* Graph-based portfolio diversification constraints
-* Spectral clustering for asset grouping
-* Portfolio backtesting framework
-* Runtime benchmarking experiments
+* Graph neural network based portfolio signals
+* Dynamic asset clustering
+* Reinforcement learning portfolio allocation
 * Interactive visualization dashboard
+* Real-time market data integration
 
 ---
 
