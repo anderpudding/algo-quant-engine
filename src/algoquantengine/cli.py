@@ -6,6 +6,7 @@ from algoquantengine.data.loaders import load_prices_csv
 from algoquantengine.data.preprocess import clean_prices, compute_returns
 from algoquantengine.data.features import estimate_mu_cov, corr_matrix
 
+from algoquantengine.opt import risk
 from algoquantengine.opt.mean_variance import efficient_frontier
 from algoquantengine.report.plots import plot_frontier
 from algoquantengine.report.export import export_frontier_csv, export_weights_csv
@@ -17,6 +18,11 @@ from algoquantengine.report.plots import plot_mst, plot_cluster_heatmap
 from algoquantengine.graph.algorithms import spectral_clusters_from_corr
 from algoquantengine.graph.constraints import cluster_weight_caps
 from algoquantengine.report.export import export_group_caps_json
+
+from algoquantengine.sim.scenarios import bootstrap_return_scenarios
+from algoquantengine.opt.risk import portfolio_pnl_from_scenarios, var_cvar, max_drawdown
+from algoquantengine.opt.backtest import backtest_rebalance
+from algoquantengine.report.export import export_report_json
 
 import pandas as pd
 import numpy as np
@@ -95,6 +101,22 @@ def build_parser() -> argparse.ArgumentParser:
     hy.add_argument("--frontier", type=int, default=25)
     hy.add_argument("--out-dir", default="outputs/reports/hybrid0")
     hy.set_defaults(func=cmd_hybrid)
+
+    risk = sub.add_parser("risk", help="Compute VaR/CVaR and drawdown from backtest")
+    risk.add_argument("--data", required=True)
+    risk.add_argument("--date-col", default="Date")
+    risk.add_argument("--assets", type=int, default=None)
+    risk.add_argument("--returns", choices=["log", "simple"], default="log")
+    risk.add_argument("--annualize", type=int, default=252)
+    risk.add_argument("--drop-thresh", type=float, default=0.05)
+    risk.add_argument("--frontier", type=int, default=25)
+    risk.add_argument("--alpha", type=float, default=0.95)
+    risk.add_argument("--paths", type=int, default=2000)
+    risk.add_argument("--horizon", type=int, default=10)
+    risk.add_argument("--rebalance", type=int, default=21)
+    risk.add_argument("--lookback", type=int, default=252)
+    risk.add_argument("--out-dir", default="outputs/reports/risk0")
+    risk.set_defaults(func=cmd_risk)
 
     return p
 
@@ -214,6 +236,71 @@ def cmd_hybrid(args: argparse.Namespace) -> None:
     print(f"Saved: {tab_dir/'frontier_capped.csv'}")
     print(f"Saved: {tab_dir/'weights_best_sharpe_capped.csv'}")
     print(f"Saved: {fig_dir/'frontier_capped.png'}")
+
+def cmd_risk(args: argparse.Namespace) -> None:
+    prices = load_prices_csv(args.data, date_col=args.date_col)
+    prices = clean_prices(prices, fill_method="ffill", drop_thresh=args.drop_thresh)
+
+    if args.assets is not None:
+        prices = prices.iloc[:, : args.assets]
+
+    tickers = list(prices.columns)
+    rets = compute_returns(prices, method=args.returns)
+    mu, cov = estimate_mu_cov(rets, annualize=args.annualize)
+
+    # baseline weights: best sharpe from unconstrained frontier
+    frontier = efficient_frontier(cov, mu, n_points=args.frontier)
+    best = max(frontier, key=lambda p: p["sharpe"])
+    w = best["weights"]
+
+    # VaR/CVaR via bootstrap scenarios
+    scen = bootstrap_return_scenarios(rets, horizon=args.horizon, n_paths=args.paths, seed=42)
+    pnl = portfolio_pnl_from_scenarios(scen, w)
+    var95, cvar95 = var_cvar(pnl, alpha=args.alpha)
+
+    # drawdown via backtest (recompute weights at each rebalance from window)
+    def make_w(window_returns):
+        mu_w, cov_w = estimate_mu_cov(window_returns, annualize=args.annualize)
+        fr = efficient_frontier(cov_w, mu_w, n_points=max(10, args.frontier // 2))
+        b = max(fr, key=lambda p: p["sharpe"])
+        return b["weights"]
+
+    equity = backtest_rebalance(
+        prices=prices,
+        rebalance_every=args.rebalance,
+        lookback=args.lookback,
+        make_weights_fn=make_w,
+    )
+    mdd = max_drawdown(equity.to_numpy())
+
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    report = {
+        "n_assets": len(tickers),
+        "n_obs_returns": int(rets.shape[0]),
+        "params": {
+            "alpha": args.alpha,
+            "paths": args.paths,
+            "horizon": args.horizon,
+            "rebalance": args.rebalance,
+            "lookback": args.lookback,
+        },
+        "best_portfolio": {
+            "return": float(best["return"]),
+            "vol": float(best["vol"]),
+            "sharpe": float(best["sharpe"]),
+        },
+        "risk": {
+            "VaR": float(var95),
+            "CVaR": float(cvar95),
+            "max_drawdown": float(mdd),
+        },
+    }
+
+    export_report_json(report, str(out_dir / "risk_report.json"))
+    print("OK")
+    print(f"Saved: {out_dir/'risk_report.json'}")
 
 
 def main() -> None:
