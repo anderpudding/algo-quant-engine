@@ -1,0 +1,21 @@
+{
+  "n_assets": 2,
+  "n_obs_returns": 9,
+  "params": {
+    "alpha": 0.95,
+    "paths": 500,
+    "horizon": 5,
+    "rebalance": 1,
+    "lookback": 3
+  },
+  "best_portfolio": {
+    "return": 2.133104520037607,
+    "vol": 0.11800498909705097,
+    "sharpe": 18.076392670849497
+  },
+  "risk": {
+    "VaR": -0.00946074083760097,
+    "CVaR": -0.004919862578538994,
+    "max_drawdown": 0.0095298079137357
+  }
+}
