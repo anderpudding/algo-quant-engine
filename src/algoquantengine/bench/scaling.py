@@ -4,8 +4,10 @@ import time
 import numpy as np
 import pandas as pd
 
-from algoquantengine.graph.algorithms import mst_from_corr
-from algoquantengine.opt.meanvar import estimate_mu_cov, efficient_frontier
+from algoquantengine.graph.build import build_graph_from_corr
+from algoquantengine.graph.algorithms import compute_mst
+from algoquantengine.data.features import estimate_mu_cov
+from algoquantengine.opt.mean_variance import efficient_frontier
 
 
 def random_returns(T: int, N: int, seed: int = 0) -> pd.DataFrame:
@@ -32,8 +34,11 @@ def benchmark_scaling(
 
         # graph
         corr = rets.corr().to_numpy()
+        tickers = list(rets.columns)
+
         t0 = time.perf_counter()
-        mst_from_corr(corr)
+        G = build_graph_from_corr(tickers, corr, threshold=None)
+        mst = compute_mst(G, weight="dist")
         t_graph = time.perf_counter() - t0
 
         # optimizer
