@@ -125,6 +125,28 @@ def build_parser() -> argparse.ArgumentParser:
     bench.add_argument("--out-dir", default="outputs/benchmarks")
     bench.set_defaults(func=cmd_benchmark)
 
+    demo = sub.add_parser("demo", help="Run full end-to-end demo pipeline")
+    demo.add_argument("--data", required=True)
+    demo.add_argument("--date-col", default="Date")
+    demo.add_argument("--assets", type=int, default=None)
+    demo.add_argument("--returns", choices=["log", "simple"], default="log")
+    demo.add_argument("--annualize", type=int, default=252)
+    demo.add_argument("--drop-thresh", type=float, default=0.05)
+    demo.add_argument("--threshold", type=float, default=0.3)
+    demo.add_argument("--clusters", type=int, default=6)
+    demo.add_argument("--cap", type=float, default=0.25)
+    demo.add_argument("--frontier", type=int, default=25)
+
+    demo.add_argument("--alpha", type=float, default=0.95)
+    demo.add_argument("--paths", type=int, default=2000)
+    demo.add_argument("--horizon", type=int, default=10)
+    demo.add_argument("--rebalance", type=int, default=21)
+    demo.add_argument("--lookback", type=int, default=252)
+
+    demo.add_argument("--benchmark", action="store_true")
+    demo.add_argument("--out-dir", default="outputs/demo")
+    demo.set_defaults(func=cmd_demo)
+
     return p
 
 def cmd_graph(args: argparse.Namespace) -> None:
@@ -328,6 +350,50 @@ def cmd_benchmark(args):
     print("OK")
     print(f"Saved: {csv_path}")
     print(f"Saved: {fig_path}")
+
+def cmd_demo(args: argparse.Namespace) -> None:
+    """
+    One-command demo:
+      1) graph
+      2) hybrid (cluster caps)
+      3) risk
+      4) benchmark (optional)
+    """
+    base_out = Path(args.out_dir)
+    base_out.mkdir(parents=True, exist_ok=True)
+
+    # 1) graph
+    cmd_graph(argparse.Namespace(
+        data=args.data, date_col=args.date_col, assets=args.assets, returns=args.returns,
+        annualize=args.annualize, drop_thresh=args.drop_thresh,
+        threshold=args.threshold, clusters=args.clusters,
+        out_dir=str(base_out / "graph"),
+    ))
+
+    # 2) hybrid
+    cmd_hybrid(argparse.Namespace(
+        data=args.data, date_col=args.date_col, assets=args.assets, returns=args.returns,
+        annualize=args.annualize, drop_thresh=args.drop_thresh,
+        clusters=args.clusters, cap=args.cap, frontier=args.frontier,
+        out_dir=str(base_out / "hybrid"),
+    ))
+
+    # 3) risk (use small defaults for demo datasets)
+    cmd_risk(argparse.Namespace(
+        data=args.data, date_col=args.date_col, assets=args.assets, returns=args.returns,
+        annualize=args.annualize, drop_thresh=args.drop_thresh,
+        frontier=max(10, args.frontier),
+        alpha=args.alpha, paths=args.paths, horizon=args.horizon,
+        rebalance=args.rebalance, lookback=args.lookback,
+        out_dir=str(base_out / "risk"),
+    ))
+
+    # 4) benchmark
+    if args.benchmark:
+        cmd_benchmark(argparse.Namespace(out_dir=str(base_out / "benchmarks")))
+
+    print("OK")
+    print(f"Saved demo outputs to: {base_out}")
 
 def main() -> None:
     parser = build_parser()
