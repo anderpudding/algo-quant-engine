@@ -37,10 +37,10 @@ The goal is to explore how **market network structure** can shape portfolio cons
         +-------------+-------------+
         |                           |
         v                           v
-+---------------+         +----------------+
-| Graph Engine  |         | Optimization   |
-| (MST, network)|         | (Mean-Variance)|
-+-------+-------+         +--------+-------+
++---------------+           +----------------+
+| Graph Engine  |           | Optimization   |
+| (MST, network)|           | (Mean-Variance)|
++-------+-------+           +--------+-------+
         |                           |
         +-------------+-------------+
                       |
