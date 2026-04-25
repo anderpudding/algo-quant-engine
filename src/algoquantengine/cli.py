@@ -27,6 +27,9 @@ from algoquantengine.report.export import export_report_json
 from algoquantengine.bench.scaling import benchmark_scaling
 from algoquantengine.bench.plot import plot_scaling
 
+from algoquantengine.opt.strategies import equal_weight, mean_variance_best_sharpe, min_variance
+from algoquantengine.report.compare import evaluate_strategy, build_comparison_table, static_backtest
+
 import pandas as pd
 import numpy as np
 
@@ -146,6 +149,16 @@ def build_parser() -> argparse.ArgumentParser:
     demo.add_argument("--benchmark", action="store_true")
     demo.add_argument("--out-dir", default="outputs/demo")
     demo.set_defaults(func=cmd_demo)
+
+    cmp = sub.add_parser("compare", help="Compare portfolio strategies")
+    cmp.add_argument("--data", required=True)
+    cmp.add_argument("--date-col", default="Date")
+    cmp.add_argument("--assets", type=int, default=None)
+    cmp.add_argument("--paths", type=int, default=1000)
+    cmp.add_argument("--horizon", type=int, default=10)
+    cmp.add_argument("--alpha", type=float, default=0.95)
+    cmp.add_argument("--out-dir", default="outputs/reports/compare")
+    cmp.set_defaults(func=cmd_compare)
 
     return p
 
@@ -394,6 +407,54 @@ def cmd_demo(args: argparse.Namespace) -> None:
 
     print("OK")
     print(f"Saved demo outputs to: {base_out}")
+
+def cmd_compare(args):
+    prices = load_prices_csv(args.data, date_col=args.date_col)
+    prices = clean_prices(prices)
+
+    if args.assets:
+        prices = prices.iloc[:, :args.assets]
+
+    rets = compute_returns(prices)
+    mu, cov = estimate_mu_cov(rets)
+
+    n = len(prices.columns)
+
+    # strategies
+    w_eq = equal_weight(n)
+    w_mv = mean_variance_best_sharpe(cov, mu)
+    w_min = min_variance(cov)
+
+    strategies = [
+        ("Equal Weight", w_eq),
+        ("Mean-Variance", w_mv),
+        ("Min Variance", w_min),
+    ]
+
+    results = []
+
+    for name, w in strategies:
+        res = evaluate_strategy(
+            name=name,
+            weights=w,
+            rets=rets,
+            prices=prices,
+            paths=args.paths,
+            horizon=args.horizon,
+            alpha=args.alpha,
+            backtest_fn=lambda p, w=w: static_backtest(p, w),
+        )
+        results.append(res)
+
+    df = build_comparison_table(results)
+
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    df.to_csv(out_dir / "strategy_comparison.csv", index=False)
+
+    print("OK")
+    print(df)
 
 def main() -> None:
     parser = build_parser()
