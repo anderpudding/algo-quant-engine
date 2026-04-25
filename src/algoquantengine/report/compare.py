@@ -58,3 +58,23 @@ def static_backtest(prices, weights):
         equity.append(eq)
 
     return pd.Series(equity, index=rets.index)
+
+def compute_turnover(prev_w: np.ndarray, new_w: np.ndarray) -> float:
+    return float(np.abs(new_w - prev_w).sum())
+
+def apply_transaction_costs(
+    equity: np.ndarray,
+    turnover_series: np.ndarray,
+    cost_rate: float
+) -> np.ndarray:
+    """
+    Applies proportional transaction cost to equity curve.
+    cost_rate: e.g. 0.001 = 10bps per unit turnover
+    """
+    eq = equity.copy()
+
+    for i in range(1, len(eq)):
+        cost = turnover_series[i] * cost_rate
+        eq[i] = eq[i] * (1.0 - cost)
+
+    return eq
