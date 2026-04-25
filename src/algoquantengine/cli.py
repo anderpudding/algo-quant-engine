@@ -30,6 +30,8 @@ from algoquantengine.bench.plot import plot_scaling
 from algoquantengine.opt.strategies import equal_weight, mean_variance_best_sharpe, min_variance
 from algoquantengine.report.compare import evaluate_strategy, build_comparison_table, static_backtest
 
+from algoquantengine.report.compare_plots import export_strategy_dashboard
+
 import pandas as pd
 import numpy as np
 
@@ -454,8 +456,12 @@ def cmd_compare(args):
     out_dir.mkdir(parents=True, exist_ok=True)
 
     df.to_csv(out_dir / "strategy_comparison.csv", index=False)
+    fig_dir = out_dir / "figures"
+    export_strategy_dashboard(df, str(fig_dir))
 
     print("OK")
+    print(f"Saved: {out_dir / 'strategy_comparison.csv'}")
+    print(f"Saved figures to: {fig_dir}")
     print(df)
 
 def main() -> None:
