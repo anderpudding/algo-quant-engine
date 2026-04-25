@@ -158,6 +158,7 @@ def build_parser() -> argparse.ArgumentParser:
     cmp.add_argument("--horizon", type=int, default=10)
     cmp.add_argument("--alpha", type=float, default=0.95)
     cmp.add_argument("--out-dir", default="outputs/reports/compare")
+    cmp.add_argument("--cost-rate", type=float, default=0.001)
     cmp.set_defaults(func=cmd_compare)
 
     return p
@@ -443,6 +444,7 @@ def cmd_compare(args):
             horizon=args.horizon,
             alpha=args.alpha,
             backtest_fn=lambda p, w=w: static_backtest(p, w),
+            cost_rate=args.cost_rate,
         )
         results.append(res)
 
