@@ -9,13 +9,24 @@ def backtest_rebalance(
     rebalance_every: int,
     lookback: int,
     make_weights_fn,
-) -> pd.Series:
+    return_turnover: bool = False,
+):
     """
     Walk-forward backtest using simple returns.
-    Returns equity curve series (starting at 1.0 at the first backtest date).
+
+    At each rebalance date:
+    - estimate weights using past lookback returns
+    - hold until next rebalance
+    - track turnover when weights change
+
+    If return_turnover=False:
+        returns equity curve only.
+
+    If return_turnover=True:
+        returns (equity curve, turnover series).
     """
     if rebalance_every < 1 or lookback < 2:
-        raise ValueError("rebalance_every must be >=1 and lookback >=2")
+        raise ValueError("rebalance_every must be >= 1 and lookback >= 2")
 
     rets = prices.pct_change().dropna(how="any")
     if len(rets) <= lookback:
@@ -23,21 +34,43 @@ def backtest_rebalance(
 
     equity: list[float] = []
     eq_dates: list[pd.Timestamp] = []
+    turnover_values: list[float] = []
 
     current_w = None
+    prev_w = None
     eq = 1.0
 
     for t in range(lookback, len(rets)):
-        if (t - lookback) % rebalance_every == 0 or current_w is None:
+        is_rebalance = (t - lookback) % rebalance_every == 0 or current_w is None
+
+        if is_rebalance:
             window = rets.iloc[t - lookback : t]
-            current_w = np.asarray(make_weights_fn(window), dtype=float)
-            if current_w.ndim != 1 or current_w.size != rets.shape[1]:
+            new_w = np.asarray(make_weights_fn(window), dtype=float)
+
+            if new_w.ndim != 1 or new_w.size != rets.shape[1]:
                 raise ValueError("make_weights_fn returned invalid weight vector")
 
+            if prev_w is None:
+                turnover = 0.0
+            else:
+                turnover = float(np.abs(new_w - prev_w).sum())
+
+            current_w = new_w
+            prev_w = new_w.copy()
+        else:
+            turnover = 0.0
+
         r_t = float(rets.iloc[t].to_numpy() @ current_w)
-        eq *= (1.0 + r_t)
+        eq *= 1.0 + r_t
 
         equity.append(eq)
         eq_dates.append(rets.index[t])
+        turnover_values.append(turnover)
 
-    return pd.Series(equity, index=eq_dates, name="equity")
+    equity_series = pd.Series(equity, index=eq_dates, name="equity")
+    turnover_array = np.asarray(turnover_values, dtype=float)
+
+    if return_turnover:
+        return equity_series, turnover_array
+
+    return equity_series
