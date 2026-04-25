@@ -46,3 +46,15 @@ def evaluate_strategy(
 
 def build_comparison_table(results: list[dict]) -> pd.DataFrame:
     return pd.DataFrame(results).sort_values(by="sharpe", ascending=False)
+
+def static_backtest(prices, weights):
+    rets = prices.pct_change().dropna()
+    eq = 1.0
+    equity = []
+
+    for i in range(len(rets)):
+        r = float(rets.iloc[i].to_numpy() @ weights)
+        eq *= (1.0 + r)
+        equity.append(eq)
+
+    return pd.Series(equity, index=rets.index)
