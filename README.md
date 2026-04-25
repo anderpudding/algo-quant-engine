@@ -274,6 +274,25 @@ python -m algoquantengine demo --data data/raw/prices_demo.csv
 
 Runs the complete system.
 
+#### Strategy Visualization Dashboard
+
+The strategy comparison command exports visual summaries:
+
+- Strategy return bar chart
+- Risk-return scatter plot
+- Drawdown comparison
+- Gross vs net return after transaction costs
+
+Run:
+
+```bash
+python -m algoquantengine compare
+  --data data/raw/prices_demo.csv
+  --paths 500
+  --horizon 5
+  --out-dir outputs/reports/compare_demo
+```
+
 ---
 
 ## Project Structure
