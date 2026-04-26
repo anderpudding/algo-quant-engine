@@ -50,6 +50,12 @@ from algoquantengine.report.compare_plots import export_strategy_dashboard
 from algoquantengine.bench.scaling import benchmark_scaling
 from algoquantengine.bench.plot import plot_scaling
 
+from algoquantengine.report.rolling_compare import run_rolling_strategy_comparison
+from algoquantengine.report.rolling_plots import (
+    plot_rolling_equity_curves,
+    plot_rolling_drawdowns,
+)
+
 
 def load_clean_validate_prices(args: argparse.Namespace) -> pd.DataFrame:
     prices = load_prices_csv(args.data, date_col=args.date_col)
@@ -403,6 +409,45 @@ def cmd_compare(args: argparse.Namespace) -> None:
     print(f"Saved figures to: {fig_dir}")
     print(df)
 
+def cmd_rolling_compare(args: argparse.Namespace) -> None:
+    prices = load_prices_csv(args.data, date_col=args.date_col)
+    prices = clean_prices(prices, fill_method="ffill", drop_thresh=args.drop_thresh)
+
+    if args.assets is not None:
+        prices = prices.iloc[:, : args.assets]
+
+    if getattr(args, "validate_data", False):
+        validate_price_frame(prices, min_rows=args.min_rows, min_assets=args.min_assets)
+
+    metrics_df, equity_df = run_rolling_strategy_comparison(
+        prices=prices,
+        lookback=args.lookback,
+        rebalance=args.rebalance,
+        transaction_cost=args.cost,
+    )
+
+    out_dir = Path(args.out_dir)
+    fig_dir = out_dir / "figures"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fig_dir.mkdir(parents=True, exist_ok=True)
+
+    metrics_df.to_csv(out_dir / "rolling_strategy_metrics.csv", index=False)
+    equity_df.to_csv(out_dir / "rolling_equity_curves.csv")
+
+    plot_rolling_equity_curves(
+        equity_df,
+        str(fig_dir / "rolling_equity_curves.png"),
+    )
+    plot_rolling_drawdowns(
+        equity_df,
+        str(fig_dir / "rolling_drawdowns.png"),
+    )
+
+    print("OK")
+    print(f"Saved: {out_dir / 'rolling_strategy_metrics.csv'}")
+    print(f"Saved: {out_dir / 'rolling_equity_curves.csv'}")
+    print(f"Saved figures to: {fig_dir}")
+    print(metrics_df)
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="algoquantengine")
@@ -473,8 +518,21 @@ def build_parser() -> argparse.ArgumentParser:
     cmp.add_argument("--cost-rate", type=float, default=0.001)
     cmp.set_defaults(func=cmd_compare)
 
-    return p
+    roll = sub.add_parser("rolling-compare", help="Run rolling-window strategy comparison")
+    roll.add_argument("--data", required=True)
+    roll.add_argument("--date-col", default="Date")
+    roll.add_argument("--assets", type=int, default=None)
+    roll.add_argument("--drop-thresh", type=float, default=0.05)
+    roll.add_argument("--lookback", type=int, default=60)
+    roll.add_argument("--rebalance", type=int, default=21)
+    roll.add_argument("--cost", type=float, default=0.001, help="Transaction cost per unit turnover")
+    roll.add_argument("--validate-data", action="store_true")
+    roll.add_argument("--min-rows", type=int, default=90)
+    roll.add_argument("--min-assets", type=int, default=5)
+    roll.add_argument("--out-dir", default="outputs/reports/rolling_compare")
+    roll.set_defaults(func=cmd_rolling_compare)
 
+    return p
 
 def main() -> None:
     parser = build_parser()
