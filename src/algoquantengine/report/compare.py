@@ -123,6 +123,17 @@ def evaluate_strategy(
         "cost_rate": float(cost_rate),
     }
 
+def static_backtest(prices: pd.DataFrame, weights: np.ndarray):
+    rets = prices.pct_change().dropna(how="any")
+    eq = 1.0
+    equity = []
+
+    for i in range(len(rets)):
+        r = float(rets.iloc[i].to_numpy() @ weights)
+        eq *= 1.0 + r
+        equity.append(eq)
+
+    return pd.Series(equity, index=rets.index)
 
 def build_comparison_table(results: list[dict]) -> pd.DataFrame:
     return pd.DataFrame(results).sort_values(by="net_sharpe", ascending=False)
