@@ -337,6 +337,8 @@ Experiments are designed to be reproducible.
 * Synthetic data generation uses deterministic seeds.
 * Benchmark experiments use fixed parameters.
 
+---
+
 ## Real Market Data Workflow
 
 AlgoQuantEngine can run on larger historical price datasets with one date column and one column per asset.
@@ -368,6 +370,32 @@ python -m algoquantengine compare \
   --horizon 10 \
   --out-dir outputs/reports/compare_real
 ```
+
+---
+
+## Rolling Strategy Comparison
+
+Run walk-forward strategy comparison with periodic rebalancing and transaction costs:
+
+```bash
+python -m algoquantengine rolling-compare
+  --data data/processed/my_prices_clean.csv
+  --lookback 126
+  --rebalance 21
+  --cost 0.001
+  --out-dir outputs/reports/rolling_compare_real
+```
+
+Outputs:
+
+```
+rolling_strategy_metrics.csv
+rolling_equity_curves.csv
+figures/rolling_equity_curves.png
+figures/rolling_drawdowns.png
+```
+
+Metrics include total return, annualized return, volatility, Sharpe ratio, max drawdown, average turnover, and transaction cost setting.
 
 ---
 
