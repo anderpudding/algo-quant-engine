@@ -337,6 +337,38 @@ Experiments are designed to be reproducible.
 * Synthetic data generation uses deterministic seeds.
 * Benchmark experiments use fixed parameters.
 
+## Real Market Data Workflow
+
+AlgoQuantEngine can run on larger historical price datasets with one date column and one column per asset.
+
+Expected CSV format:
+
+```csv
+Date,AAPL,MSFT,NVDA,GOOG,AMZN
+2021-01-04,129.41,217.69,13.08,86.41,159.33
+```
+
+Clean a raw CSV:
+
+```
+python scripts/prepare_prices_csv.py \
+  --input data/raw/real/my_prices.csv \
+  --output data/processed/my_prices_clean.csv
+```
+
+Run strategy comparison:
+
+```
+python -m algoquantengine compare \
+  --data data/processed/my_prices_clean.csv \
+  --validate-data \
+  --min-rows 252 \
+  --min-assets 20 \
+  --paths 1000 \
+  --horizon 10 \
+  --out-dir outputs/reports/compare_real
+```
+
 ---
 
 ## Future Development
