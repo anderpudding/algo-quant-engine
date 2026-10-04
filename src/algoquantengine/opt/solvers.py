@@ -37,7 +37,7 @@ def _apply_group_caps(
     caps: list[tuple[list[int], float]] | None,
     *,
     eps: float = 1e-12,
-    max_rounds: int = 50,
+    max_rounds: int = 10000,
 ) -> np.ndarray:
     """
     Iteratively enforce group caps and simplex constraint.
@@ -46,6 +46,9 @@ def _apply_group_caps(
     in practice by alternating:
       (1) scale down violating groups
       (2) project back to simplex
+
+    Uneven groups can converge slowly; allow extra rounds while retaining
+    early termination as soon as all caps are satisfied.
     """
     if not caps:
         return project_to_simplex(w)
