@@ -276,7 +276,9 @@ Runs the complete system.
 
 #### Strategy Visualization Dashboard
 
-The strategy comparison command exports visual summaries:
+The strategy comparison command evaluates Equal Weight, Mean-Variance, Minimum
+Variance (reported as `Min Variance`), and Hybrid Graph-Constrained portfolios
+with the same metrics and exports these visual summaries:
 
 - Strategy return bar chart
 - Risk-return scatter plot
@@ -286,10 +288,11 @@ The strategy comparison command exports visual summaries:
 Run:
 
 ```bash
-python -m algoquantengine compare
-  --data data/raw/prices_demo.csv
-  --paths 500
-  --horizon 5
+python -m algoquantengine compare \
+  --data data/raw/prices_demo.csv \
+  --clusters 2 --cap 0.9 --seed 42 \
+  --paths 500 \
+  --horizon 5 \
   --out-dir outputs/reports/compare_demo
 ```
 
@@ -377,13 +380,21 @@ python -m algoquantengine compare \
 
 Run walk-forward strategy comparison with periodic rebalancing and transaction costs:
 
+The same four strategies are evaluated. At every Hybrid rebalance, correlation,
+graph clusters, and cluster caps are recomputed from only the current historical
+lookback window, excluding the traded date and future returns to avoid look-ahead
+bias. Both comparison commands default to `--clusters 4 --cap 0.40 --seed 42`;
+the effective cluster count times the cap must be at least 1. For the two-asset
+demo, use `--clusters 2 --cap 0.9`.
+
 ```bash
-python -m algoquantengine rolling-compare
-  --data data/processed/my_prices_clean.csv
-  --lookback 126
-  --rebalance 21
-  --cost 0.001
-  --out-dir outputs/reports/rolling_compare_real
+python -m algoquantengine rolling-compare \
+  --data data/raw/prices_demo.csv \
+  --lookback 3 \
+  --rebalance 1 \
+  --clusters 2 --cap 0.9 --seed 42 \
+  --cost 0.001 \
+  --out-dir outputs/reports/rolling_compare_demo
 ```
 
 Outputs:
