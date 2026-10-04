@@ -25,6 +25,7 @@ from algoquantengine.opt.strategies import (
     equal_weight,
     mean_variance_best_sharpe,
     min_variance,
+    hybrid_graph_constrained,
 )
 
 from algoquantengine.sim.scenarios import bootstrap_return_scenarios
@@ -371,11 +372,20 @@ def cmd_compare(args: argparse.Namespace) -> None:
     w_eq = equal_weight(n)
     w_mv = mean_variance_best_sharpe(cov, mu)
     w_min = min_variance(cov)
+    w_hybrid, _, _ = hybrid_graph_constrained(
+        cov,
+        mu,
+        corr_matrix(rets),
+        n_clusters=args.clusters,
+        max_per_cluster=args.cap,
+        seed=args.seed,
+    )
 
     strategies = [
         ("Equal Weight", w_eq),
         ("Mean-Variance", w_mv),
         ("Min Variance", w_min),
+        ("Hybrid Graph-Constrained", w_hybrid),
     ]
 
     results = []
@@ -516,6 +526,9 @@ def build_parser() -> argparse.ArgumentParser:
     cmp.add_argument("--alpha", type=float, default=0.95)
     cmp.add_argument("--out-dir", default="outputs/reports/compare")
     cmp.add_argument("--cost-rate", type=float, default=0.001)
+    cmp.add_argument("--clusters", type=int, default=4)
+    cmp.add_argument("--cap", type=float, default=0.40, help="Max total weight per cluster")
+    cmp.add_argument("--seed", type=int, default=42)
     cmp.set_defaults(func=cmd_compare)
 
     roll = sub.add_parser("rolling-compare", help="Run rolling-window strategy comparison")
