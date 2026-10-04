@@ -434,6 +434,9 @@ def cmd_rolling_compare(args: argparse.Namespace) -> None:
         lookback=args.lookback,
         rebalance=args.rebalance,
         transaction_cost=args.cost,
+        hybrid_clusters=args.clusters,
+        hybrid_cap=args.cap,
+        seed=args.seed,
     )
 
     out_dir = Path(args.out_dir)
@@ -539,6 +542,9 @@ def build_parser() -> argparse.ArgumentParser:
     roll.add_argument("--lookback", type=int, default=60)
     roll.add_argument("--rebalance", type=int, default=21)
     roll.add_argument("--cost", type=float, default=0.001, help="Transaction cost per unit turnover")
+    roll.add_argument("--clusters", type=int, default=4)
+    roll.add_argument("--cap", type=float, default=0.40, help="Max total weight per cluster")
+    roll.add_argument("--seed", type=int, default=42)
     roll.add_argument("--validate-data", action="store_true")
     roll.add_argument("--min-rows", type=int, default=90)
     roll.add_argument("--min-assets", type=int, default=5)

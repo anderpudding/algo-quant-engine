@@ -3,11 +3,12 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from algoquantengine.data.features import estimate_mu_cov
+from algoquantengine.data.features import estimate_mu_cov, corr_matrix
 from algoquantengine.opt.strategies import (
     equal_weight,
     mean_variance_best_sharpe,
     min_variance,
+    hybrid_graph_constrained,
 )
 from algoquantengine.opt.risk import max_drawdown
 
@@ -42,6 +43,9 @@ def _annualized_metrics(equity: pd.Series, periods_per_year: int = 252) -> dict:
 def _strategy_weights(
     strategy: str,
     window_returns: pd.DataFrame,
+    hybrid_clusters: int = 4,
+    hybrid_cap: float = 0.40,
+    seed: int = 42,
 ) -> np.ndarray:
     n = window_returns.shape[1]
 
@@ -56,6 +60,17 @@ def _strategy_weights(
     if strategy == "Min Variance":
         return min_variance(cov)
 
+    if strategy == "Hybrid Graph-Constrained":
+        weights, _, _ = hybrid_graph_constrained(
+            cov,
+            mu,
+            corr_matrix(window_returns),
+            n_clusters=hybrid_clusters,
+            max_per_cluster=hybrid_cap,
+            seed=seed,
+        )
+        return weights
+
     raise ValueError(f"Unknown strategy: {strategy}")
 
 
@@ -65,9 +80,15 @@ def run_rolling_strategy_comparison(
     lookback: int = 60,
     rebalance: int = 21,
     transaction_cost: float = 0.001,
+    hybrid_clusters: int = 4,
+    hybrid_cap: float = 0.40,
+    seed: int = 42,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Rolling walk-forward comparison.
+
+    Hybrid correlation, clusters, and caps are recomputed at each rebalance
+    using only the historical lookback returns, excluding the traded date.
 
     transaction_cost:
       0.001 = 10 bps per unit turnover.
@@ -76,7 +97,9 @@ def run_rolling_strategy_comparison(
       metrics_df, equity_df
     """
     if strategies is None:
-        strategies = ["Equal Weight", "Mean-Variance", "Min Variance"]
+        strategies = [
+            "Equal Weight", "Mean-Variance", "Min Variance", "Hybrid Graph-Constrained"
+        ]
 
     if lookback < 2:
         raise ValueError("lookback must be >= 2")
@@ -102,7 +125,13 @@ def run_rolling_strategy_comparison(
 
             if should_rebalance:
                 window = rets.iloc[t - lookback : t]
-                new_w = _strategy_weights(strategy, window)
+                new_w = _strategy_weights(
+                    strategy,
+                    window,
+                    hybrid_clusters=hybrid_clusters,
+                    hybrid_cap=hybrid_cap,
+                    seed=seed,
+                )
 
                 if prev_w[strategy] is None:
                     turnover = 0.0
