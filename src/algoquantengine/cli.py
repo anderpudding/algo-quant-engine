@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from algoquantengine.data.loaders import load_prices_csv
+from algoquantengine.data.loaders import load_prices_csv, load_benchmark_prices_csv
 from algoquantengine.data.preprocess import clean_prices, compute_returns
 from algoquantengine.data.features import estimate_mu_cov, corr_matrix
 from algoquantengine.data.validate import validate_price_frame
@@ -55,6 +55,15 @@ from algoquantengine.report.rolling_compare import run_rolling_strategy_comparis
 from algoquantengine.report.rolling_plots import (
     plot_rolling_equity_curves,
     plot_rolling_drawdowns,
+)
+from algoquantengine.report.factor_analysis import (
+    build_factor_exposure_table,
+    build_rolling_factor_tables,
+)
+from algoquantengine.report.factor_plots import (
+    plot_strategy_vs_benchmark,
+    plot_rolling_beta,
+    plot_rolling_correlation,
 )
 
 
@@ -456,6 +465,28 @@ def cmd_rolling_compare(args: argparse.Namespace) -> None:
         str(fig_dir / "rolling_drawdowns.png"),
     )
 
+    if args.benchmark_data is not None:
+        benchmark_prices = load_benchmark_prices_csv(
+            args.benchmark_data, column=args.benchmark_column, date_col=args.date_col
+        )
+        benchmark_returns = benchmark_prices.pct_change(fill_method=None)
+        exposure = build_factor_exposure_table(
+            equity_df, benchmark_returns,
+            risk_free_rate=args.risk_free_rate, annualization=args.annualization,
+        )
+        beta, correlation = build_rolling_factor_tables(
+            equity_df, benchmark_returns, window=args.factor_window
+        )
+        exposure.to_csv(out_dir / "factor_exposure.csv", index=False)
+        beta.to_csv(out_dir / "rolling_beta.csv")
+        correlation.to_csv(out_dir / "rolling_correlation.csv")
+        plot_strategy_vs_benchmark(
+            equity_df, benchmark_prices, str(fig_dir / "strategy_vs_benchmark.png")
+        )
+        plot_rolling_beta(beta, str(fig_dir / "rolling_beta.png"))
+        plot_rolling_correlation(correlation, str(fig_dir / "rolling_correlation.png"))
+        print(f"Saved benchmark analysis to: {out_dir}")
+
     print("OK")
     print(f"Saved: {out_dir / 'rolling_strategy_metrics.csv'}")
     print(f"Saved: {out_dir / 'rolling_equity_curves.csv'}")
@@ -545,6 +576,11 @@ def build_parser() -> argparse.ArgumentParser:
     roll.add_argument("--clusters", type=int, default=4)
     roll.add_argument("--cap", type=float, default=0.40, help="Max total weight per cluster")
     roll.add_argument("--seed", type=int, default=42)
+    roll.add_argument("--benchmark-data", default=None, help="Optional independent benchmark price CSV")
+    roll.add_argument("--benchmark-column", default=None, help="Numeric benchmark price column")
+    roll.add_argument("--risk-free-rate", type=float, default=0.0, help="Annual effective risk-free rate for factor alpha")
+    roll.add_argument("--annualization", type=int, default=252, help="Periods per year for factor metrics")
+    roll.add_argument("--factor-window", type=int, default=60, help="Common return observations per rolling factor window")
     roll.add_argument("--validate-data", action="store_true")
     roll.add_argument("--min-rows", type=int, default=90)
     roll.add_argument("--min-assets", type=int, default=5)

@@ -410,6 +410,65 @@ Metrics include total return, annualized return, volatility, Sharpe ratio, max d
 
 ---
 
+## Benchmark / Factor Exposure Analysis
+
+Optionally evaluate every rolling strategy against an independent benchmark
+price CSV: annualized regression alpha, beta, benchmark correlation, R², active
+return, tracking error, information ratio, and residual volatility.
+
+```bash
+python -m algoquantengine rolling-compare \
+  --data data/processed/my_prices_clean.csv \
+  --benchmark-data data/processed/spy_prices.csv \
+  --benchmark-column SPY \
+  --lookback 126 \
+  --rebalance 21 \
+  --clusters 4 \
+  --cap 0.35 \
+  --cost 0.001 \
+  --factor-window 60 \
+  --out-dir outputs/reports/rolling_compare_real
+```
+
+The benchmark CSV uses the same date column (`Date` by default, configurable
+with `--date-col`). Specify `--benchmark-column` when there are multiple numeric
+columns; a single numeric price column is selected automatically. The benchmark
+does not change the investable universe or portfolio weights. Without
+`--benchmark-data`, existing outputs and behavior are unchanged.
+
+Analysis uses realized net walk-forward equity returns after transaction costs,
+not future information for portfolio construction. Both equity and benchmark
+prices use simple `pct_change(fill_method=None)` returns computed before date
+alignment, with no filling. All strategies use the same common, complete dates.
+Inputs should have the same observation frequency and comparable return periods.
+The first equity point supplies the starting level, so its return is excluded.
+
+`--risk-free-rate` is an annual effective rate (default 0), converted to a periodic
+rate as `(1 + rate) ** (1 / annualization) - 1`. OLS regresses strategy excess
+returns on benchmark excess returns. Alpha is the intercept times
+`--annualization` (default 252); active return is the mean return difference times
+annualization. Tracking error and residual volatility use sample standard
+deviations times `sqrt(annualization)`. Information ratio is active return divided
+by tracking error, or NaN when periodic active-return standard deviation is at
+most `1e-12`. R² is `1 - SSE / SST`; constant strategies have NaN correlation/R².
+Summary analysis requires at least two common returns and raises an error for
+benchmark variance at most `1e-16`.
+
+Additional outputs are `factor_exposure.csv`, `rolling_beta.csv`, and
+`rolling_correlation.csv`, plus `figures/strategy_vs_benchmark.png`,
+`figures/rolling_beta.png`, and `figures/rolling_correlation.png`. The performance
+plot normalizes original equity and benchmark levels to 1 on the first common
+date. Rolling estimates require a full `--factor-window` of common observations
+(default 60, minimum 2); incomplete or constant-benchmark windows are NaN.
+These options affect factor reporting only, leaving existing strategy metrics intact.
+
+For a local smoke test, use `data/raw/prices_demo.csv` for both CSVs with
+`--benchmark-column AAPL --lookback 3 --rebalance 1 --clusters 2 --cap 0.9
+--factor-window 3`. AAPL is also investable in that tiny fixture; this is only an
+export smoke test, not a research experiment.
+
+---
+
 ## Future Development
 
 Planned improvements include:
